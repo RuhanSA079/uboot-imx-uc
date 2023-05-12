@@ -117,7 +117,7 @@
 	"optargs=setenv bootargs ${bootargs} ${kernelargs};\0" \
 	"mmcargs=setenv bootargs ${mcore_clk} console=${console} " \
 		"root=/dev/mmcblk${mmcblk}p${mmcpart} rootwait rw ${cma_size} cma_name=linux,cma\0 " \
-	"loadbootscript=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${bsp_script};\0" \
+	"loadbootscript=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bsp_script};\0" \
 	"bootscript=echo Running bootscript from mmc ...; " \
 		"source\0" \
 	"loadimage=load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image};" \
