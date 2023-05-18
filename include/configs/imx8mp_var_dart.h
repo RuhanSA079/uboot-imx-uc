@@ -13,7 +13,7 @@
 
 #include "imx_env.h"
 
-#define CONFIG_SYS_BOOTM_LEN		(32 * SZ_1M)
+#define CONFIG_SYS_BOOTM_LEN		(64 * SZ_1M)
 
 #define CONFIG_SPL_MAX_SIZE				(176 * 1024)
 #define CONFIG_SYS_MONITOR_LEN				(512 * 1024)
@@ -49,12 +49,6 @@
 #define PHY_ANEG_TIMEOUT		20000
 #endif
 
-#ifdef CONFIG_DISTRO_DEFAULTS
-#define BOOT_TARGET_DEVICES(func) \
-       func(USB, usb, 0) \
-       func(MMC, mmc, 1) \
-       func(MMC, mmc, 2)
-
 #include <config_distro_bootcmd.h>
 /* redefine BOOTENV_EFI_SET_FDTFILE_FALLBACK to use Variscite function to load fdt */
 #undef BOOTENV_EFI_SET_FDTFILE_FALLBACK
@@ -74,136 +68,53 @@
 
 /* Initial environment variables */
 #define CONFIG_EXTRA_ENV_SETTINGS		\
-	CONFIG_MFG_ENV_SETTINGS \
-	"bootdir=/boot\0"	\
-	BOOTENV \
-	"prepare_mcore=setenv mcore_clk clk-imx8mp.mcore_booted;\0" \
-	"scriptaddr=0x43500000\0" \
-	"kernel_addr_r=" __stringify(CONFIG_SYS_LOAD_ADDR) "\0" \
-	"bsp_script=boot.scr\0" \
-	"image=Image.gz\0" \
-	"img_addr=0x42000000\0" \
-	"splashimage=0x50000000\0" \
+	"bootcmd=run load_uc\0" \
+	"fitloadaddr=0x45000000\0" \
+	"loadfiles=load ${devtype} ${mmcdev}:${kernel_bootpart} ${fitloadaddr} ${kernel_prefix}/${kernel_filename}\0" \
+	"kernel_filename=kernel.img\0" \
+	"initrd_filename=initrd.img\0" \
+	"core_state=/uboot/ubuntu/boot.sel\0" \
+	"kernel_vars=snap_kernel snap_try_kernel kernel_status\0" \
+	"recovery_vars=snapd_recovery_mode snapd_recovery_system snapd_recovery_kernel\0" \
+	"snapd_recovery_mode=install\0" \
+	"snapd_standard_params=panic=-1 systemd.gpt_auto=0 rd.systemd.unit=basic.target\0" \
+	"boot_uc=run load_uc; bootm ${fitloadaddr}#conf-0\0" \
+	"mmc_seed_part=1\0" \
+	"mmc_boot_part=2\0" \
+	"devtype=mmc\0" \
 	"console=ttymxc0,115200\0" \
-	"fdt_addr_r=0x43000000\0" \
-	"fdt_addr=0x43000000\0"			\
-	"fdt_high=0xffffffffffffffff\0"		\
-	"boot_fdt=try\0" \
-	"boot_fit=no\0" \
-	"fdt_file=undefined\0" \
-	"bootm_size=0x10000000\0" \
-	"ip_dyn=yes\0" \
-	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
-	"mmcblk=1\0" \
+	"mmcdev=1\0" \
 	"mmcpart=1\0" \
-	"mmcautodetect=yes\0" \
-	"m7_addr=0x7e0000\0" \
-	"m7_bin=hello_world.bin\0" \
-	"use_m7=no\0" \
-	"dfu_alt_info=mmc 2=1 raw 0x40 0x1000 mmcpart\0" \
-	"loadm7bin=" \
-	         "load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bootdir}/${m7_bin} && " \
-	         "cp.b ${loadaddr} ${m7_addr} ${filesize}; " \
-	         "echo Init rsc_table region memory; " \
-	         "mw.b 400ff000 0 10\0" \
-	"runm7bin=" \
-		"if test ${m7_addr} = 0x7e0000; then " \
-			"echo Booting M7 from TCM; " \
+	"load_uc=" \
+      		"setenv kernel_bootpart ${mmc_seed_part};"\
+      		"load ${devtype} ${mmcdev}:${kernel_bootpart} 0x40480000 ${core_state};" \
+      		"env import -v -c 0x40480000 ${filesize} ${recovery_vars};" \
+      		"if test \"${snapd_recovery_mode}\" = \"run\"; then " \
+		  "setenv bootargs \"fde_helper=enabled console=${console} snapd_recovery_mode=${snapd_recovery_mode} ${snapd_standard_params}\";" \
+		  "setenv kernel_bootpart ${mmc_boot_part}; " \
+		  "load ${devtype} ${mmcdev}:${kernel_bootpart} 0x40480000 ${core_state}; " \
+		  "env import -v -c 0x40480000 ${filesize} ${kernel_vars}; " \
+		  "setenv kernel_name ${snap_kernel}; " \
+		  "if test -n \"${kernel_status}\"; then " \
+		    "if test \"${kernel_status}\" = \"try\"; then " \
+		      "if test -n \"${snap_try_kernel}\"; then " \
+		        "setenv kernel_status trying; " \
+			"setenv kernel_name \"${snap_try_kernel}\"; " \
+            	      "fi; " \
+                    "elif test \"${kernel_status}\" = \"trying\"; then " \
+                      "setenv kernel_status \"\"; " \
+                    "fi;" \
+          	    "env export -c 0x40480000 ${kernel_vars}; " \
+		    "save ${devtype} ${mmcdev}:${kernel_bootpart} 0x40480000 ${core_state} ${filesize}; " \
+		  "fi; " \
+		  "setenv kernel_prefix \"/uboot/ubuntu/${kernel_name}/\"; " \
 		"else " \
-			"echo Booting M7 from DRAM; " \
-			"dcache flush; " \
+		  "setenv bootargs \"fde_helper=enabled console=${console} snapd_recovery_mode=${snapd_recovery_mode} snapd_recovery_system=${snapd_recovery_system} ${snapd_standard_params}\";" \
+		  "setenv kernel_prefix \"/systems/${snapd_recovery_system}/kernel/\"; " \
 		"fi; " \
-		"bootaux ${m7_addr};\0" \
-	"optargs=setenv bootargs ${bootargs} ${kernelargs};\0" \
-	"mmcargs=setenv bootargs ${mcore_clk} console=${console} " \
-		"root=/dev/mmcblk${mmcblk}p${mmcpart} rootwait rw ${cma_size} cma_name=linux,cma\0 " \
-	"loadbootscript=load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bsp_script};\0" \
-	"bootscript=echo Running bootscript from mmc ...; " \
-		"source\0" \
-	"loadimage=load mmc ${mmcdev}:${mmcpart} ${img_addr} ${bootdir}/${image};" \
-		"unzip ${img_addr} ${loadaddr}\0" \
-	"findfdt=" \
-		"if test $fdt_file = undefined; then " \
-			"if test $board_name = VAR-SOM-MX8M-PLUS; then " \
-				"setenv fdt_file imx8mp-var-som-symphony.dtb; " \
-			"else " \
-				"if test $carrier_rev = legacy; then " \
-					"setenv fdt_file imx8mp-var-dart-dt8mcustomboard-legacy.dtb;" \
-				"else " \
-					"setenv fdt_file imx8mp-var-dart-dt8mcustomboard.dtb;" \
-				"fi; " \
-			"fi; " \
-		"fi; \0" \
-	"loadfdt=run findfdt; " \
-		"echo fdt_file=${fdt_file}; " \
-		"load mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${bootdir}/${fdt_file}\0" \
-	"ramsize_check="\
-		"if test $sdram_size -le 512; then " \
-			"setenv cma_size cma=320M; " \
-		"else " \
-			"if test $sdram_size -le 1024; then " \
-				"setenv cma_size cma=576M; " \
-			"else " \
-				"if test $sdram_size -le 2048; then " \
-					"setenv cma_size cma=640M; " \
-				"else " \
-					"setenv cma_size cma=960M; " \
-				"fi; " \
-			"fi; " \
-		"fi;\0" \
-	"mmcboot=echo Booting from mmc ...; " \
-		"run mmcargs; " \
-		"run optargs; " \
-		"if test ${boot_fit} = yes || test ${boot_fit} = try; then " \
-			"bootm ${loadaddr}; " \
-		"else " \
-			"if run loadfdt; then " \
-				"booti ${loadaddr} - ${fdt_addr_r}; " \
-			"else " \
-				"echo WARN: Cannot load the DT; " \
-			"fi; " \
-		"fi;\0" \
-	"netargs=setenv bootargs ${mcore_clk} console=${console} " \
-		"root=/dev/nfs ${cma_size} cma_name=linux,cma " \
-		"ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp\0" \
-	"netboot=echo Booting from net ...; " \
-		"run netargs;  " \
-		"run optargs;  " \
-		"if test ${ip_dyn} = yes; then " \
-			"setenv get_cmd dhcp; " \
-		"else " \
-			"setenv get_cmd tftp; " \
-		"fi; " \
-		"${get_cmd} ${img_addr} ${image}; unzip ${img_addr} ${loadaddr}; " \
-		"if test ${boot_fit} = yes || test ${boot_fit} = try; then " \
-			"bootm ${loadaddr}; " \
-		"else " \
-			"run findfdt; " \
-			"echo fdt_file=${fdt_file}; " \
-			"if ${get_cmd} ${fdt_addr} ${fdt_file}; then " \
-				"booti ${loadaddr} - ${fdt_addr_r}; " \
-			"else " \
-				"echo WARN: Cannot load the DT; " \
-			"fi; " \
-		"fi;\0" \
-	"bsp_bootcmd=echo Running BSP bootcmd ...; " \
-		"run ramsize_check; " \
-		"mmc dev ${mmcdev}; " \
-		"if mmc rescan; then " \
-			"if test ${use_m7} = yes && run loadm7bin; then " \
-				"run runm7bin; " \
-			"fi; " \
-			"if run loadbootscript; then " \
-				"run bootscript; " \
-			"else " \
-				"if run loadimage; then " \
-					"run mmcboot; " \
-				"else " \
-					"run netboot; " \
-				"fi; " \
-			"fi; " \
-		"fi;"
-
+		"run loadfiles\0" \
+	
+	
 /* Link Definitions */
 
 #define CONFIG_SYS_INIT_RAM_ADDR	0x40000000
