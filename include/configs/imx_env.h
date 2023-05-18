@@ -51,6 +51,7 @@
 		 0xa7, 0x05, 0x1f, 0x31, 0x25, 0x77)
 
 #endif
+#define CONFIG_SYS_REDUNDAND_ENVIRONMENT
 
 #define CONFIG_MFG_ENV_SETTINGS_DEFAULT \
 	"mfgtool_args=setenv bootargs console=${console},${baudrate} " \
