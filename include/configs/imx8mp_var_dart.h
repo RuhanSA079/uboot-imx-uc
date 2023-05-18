@@ -55,8 +55,6 @@
 #define BOOTENV_EFI_SET_FDTFILE_FALLBACK \
 	"setenv efi_dtb_prefixes; " \
 	"run loadfdt; "
-#else
-#define BOOTENV
 #endif
 
 #define CONFIG_MFG_ENV_SETTINGS \
