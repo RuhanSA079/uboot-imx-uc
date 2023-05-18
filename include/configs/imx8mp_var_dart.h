@@ -68,7 +68,7 @@
 #define CONFIG_EXTRA_ENV_SETTINGS		\
 	"bootcmd=run load_uc\0" \
 	"fitloadaddr=0x45000000\0" \
-	"loadfiles=load ${devtype} ${mmcdev}:${kernel_bootpart} ${fitloadaddr} ${kernel_prefix}/${kernel_filename}\0" \
+	"loadfiles=load ${devtype} ${mmcdev}:${kernel_bootpart} ${fitloadaddr} ${kernel_prefix}/${kernel_filename}; bootm ${fitloadaddr}#conf-0\0" \
 	"kernel_filename=kernel.img\0" \
 	"initrd_filename=initrd.img\0" \
 	"core_state=/uboot/ubuntu/boot.sel\0" \
